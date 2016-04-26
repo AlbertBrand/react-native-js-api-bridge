@@ -2,53 +2,55 @@ import { NativeModules } from 'react-native';
 
 const JSAPI = NativeModules.AndroidJSAPI;
 
-function matchingArgTypes(args, refArgTypes) {
+function matchingArgTypes(args, refArgTypes = []) {
   if (args.length != refArgTypes.length) return;
+
   let match = true;
-  for (let i = 0; i < arguments.length; i++) {
-    // TODO
-    if (refArgTypes[i] == 'int' && !Number.isInteger(arguments[i])) match = false;
+  for (let i = 0; i < args.length; i++) {
+    // TODO more sophisticated argument matching
+    if (refArgTypes[i] == 'int' && !Number.isInteger(args[i])) match = false;
   }
-  return true;
+  return match;
 }
 
-function wrapRefProp(className, reflect, prevWrapped) {
-  switch (reflect.type) {
-    case 'staticMethod':
-      return async function () {
-        if (!matchingArgTypes(arguments, reflect.arguments)) {
-          console.log('mismatch params, continue with prev wrapped');
-          return prevWrapped && prevWrapped(...arguments);
-        }
+function wrapMethod(objectId = 0, className, methodReflection, prevWrappedFn) {
+  return async function () {
+    if (!matchingArgTypes(arguments, methodReflection.arguments)) {
+      console.log('mismatch params, continue with prev wrapped');
+      return prevWrappedFn && prevWrappedFn(...arguments);
+    }
 
-        const typedArguments = [];
-        for (let i = 0; i < arguments.length; i++) {
-          typedArguments.push([reflect.arguments[i], arguments[i]]);
-        }
-        // TODO convert arguments type?
-        try {
-          // TODO bridge if instance returned
-          return JSAPI.staticMethodCall(className, reflect.name, typedArguments);
-        } catch (e) {
-          console.error(e);
-        }
-      };
-    case 'staticField':
-      return reflect.value;
-    default:
-      console.error('unknown type')
+    const typedArguments = [];
+    for (let i = 0; i < arguments.length; i++) {
+      typedArguments.push([methodReflection.arguments[i], arguments[i]]);
+    }
+    // TODO convert arguments type?
+    try {
+      // TODO don't bridge if primitive is returned
+      const reflection = await JSAPI.methodCall(objectId, className, methodReflection.name, typedArguments);
+      return createWrapper(reflection);
+
+    } catch (e) {
+      console.error(e);
+    }
+  };
+}
+
+function createWrapper(reflection) {
+  const ret = {};
+  for (let method of reflection.methods) {
+    ret[method.name] = wrapMethod(reflection.objectId, reflection.className, method, ret[method.name]);
   }
+  for (let field of reflection.fields) {
+    ret[field.name] = field.value;
+  }
+  return ret;
 }
 
 async function createBridge(className) {
   try {
-    const refProps = await JSAPI.reflect(className);
-
-    const ret = {};
-    for (let refProp of refProps) {
-      ret[refProp.name] = wrapRefProp(className, refProp, ret[refProp.name]);
-    }
-    return ret;
+    const reflection = await JSAPI.reflect(className);
+    return createWrapper(reflection);
 
   } catch (e) {
     console.error(e);

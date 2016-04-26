@@ -1,6 +1,7 @@
 package com.androidjsapi;
 
 import android.content.Context;
+import android.support.annotation.Nullable;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReadableArray;
@@ -59,15 +60,27 @@ public class JSAPI {
         }
     }
 
-    public ReadableArray reflect(Class<?> clazz) throws Exception {
-        WritableArray refl = Arguments.createArray();
+    public WritableMap reflect(Object object) throws Exception {
+        return reflect(object.getClass(), object);
+    }
 
-        // add static methods
-        for (Method method : clazz.getMethods()) {
-            if (Modifier.isStatic(method.getModifiers())) {
+    public WritableMap reflect(Class<?> clazz) throws Exception {
+        return reflect(clazz, null);
+    }
+
+    public WritableMap reflect(Class<?> clazz, @Nullable Object objectOrNull) throws Exception {
+        WritableMap reflection = Arguments.createMap();
+
+        // add methods
+        WritableArray methods = Arguments.createArray();
+
+        for (Method method : clazz.getDeclaredMethods()) {
+            int modifiers = method.getModifiers();
+            boolean isStatic = Modifier.isStatic(modifiers);
+            boolean isPublic = Modifier.isPublic(modifiers);
+            if (isPublic && (isStatic || objectOrNull != null)) {
                 WritableMap map = Arguments.createMap();
                 map.putString("name", method.getName());
-                map.putString("type", "staticMethod");
                 if (method.getParameterTypes().length > 0) {
                     WritableArray arguments = Arguments.createArray();
                     for (Class<?> parameterType : method.getParameterTypes()) {
@@ -75,21 +88,44 @@ public class JSAPI {
                     }
                     map.putArray("arguments", arguments);
                 }
-                refl.pushMap(map);
+                if (Modifier.isStatic(modifiers)) {
+                    map.putBoolean("static", true);
+                }
+                methods.pushMap(map);
             }
         }
 
-        // add static fields
-        for (Field field : clazz.getFields()) {
-            if (Modifier.isStatic(field.getModifiers())) {
+        // add fields
+        WritableArray fields = Arguments.createArray();
+
+        for (Field field : clazz.getDeclaredFields()) {
+            int modifiers = field.getModifiers();
+            boolean isStatic = Modifier.isStatic(modifiers);
+            boolean isPublic = Modifier.isPublic(modifiers);
+            if (isPublic && (isStatic || objectOrNull != null)) {
                 WritableMap map = Arguments.createMap();
                 map.putString("name", field.getName());
-                map.putString("type", "staticField");
-                map.putInt("value", field.getInt(null));
-                refl.pushMap(map);
+                if (field.getType().isAssignableFrom(int.class)) {
+                    map.putInt("value", field.getInt(objectOrNull));
+                } else if (field.getType().isAssignableFrom(boolean.class)) {
+                    map.putBoolean("value", field.getBoolean(objectOrNull));
+                } else if (field.getType().isAssignableFrom(double.class)) {
+                    map.putDouble("value", field.getDouble(objectOrNull));
+                } else if (field.getType().isAssignableFrom(String.class)) {
+                    map.putString("value", (String) field.get(objectOrNull));
+                }
+                // TODO add more conversions
+                if (isStatic) {
+                    map.putBoolean("static", true);
+                }
+                fields.pushMap(map);
             }
         }
 
-        return refl;
+        reflection.putArray("methods", methods);
+        reflection.putArray("fields", fields);
+        reflection.putString("className", clazz.getCanonicalName());
+
+        return reflection;
     }
 }

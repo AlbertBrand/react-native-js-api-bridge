@@ -1,5 +1,7 @@
 package com.androidjsapi;
 
+import com.facebook.react.bridge.JavaOnlyArray;
+import com.facebook.react.bridge.JavaOnlyMap;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.ReadableType;
@@ -11,9 +13,9 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Implementation of WritableArray with support for getType
+ * Implementation of JavaOnlyArray with support for getType
  */
-public class TypedArray implements WritableArray {
+public class TypedArray extends JavaOnlyArray {
     private final List<Object> backingValueList;
     private final List<ReadableType> backingTypeList;
 
@@ -74,8 +76,8 @@ public class TypedArray implements WritableArray {
     }
 
     @Override
-    public ReadableArray getArray(int index) {
-        return (ReadableArray) backingValueList.get(index);
+    public JavaOnlyArray getArray(int index) {
+        return (JavaOnlyArray) backingValueList.get(index);
     }
 
     @Override
@@ -84,8 +86,8 @@ public class TypedArray implements WritableArray {
     }
 
     @Override
-    public ReadableMap getMap(int index) {
-        return (ReadableMap) backingValueList.get(index);
+    public JavaOnlyMap getMap(int index) {
+        return (JavaOnlyMap) backingValueList.get(index);
     }
 
     @Override

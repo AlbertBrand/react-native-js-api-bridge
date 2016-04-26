@@ -3,6 +3,7 @@ package com.androidjsapi;
 import android.content.Context;
 import android.support.annotation.NonNull;
 
+import com.androidjsapi.test.TestObject;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.JavaOnlyMap;
 import com.facebook.react.bridge.ReadableArray;
@@ -23,19 +24,16 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.rule.PowerMockRule;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 
 import static com.androidjsapi.TypedArray.of;
-import static org.junit.Assert.assertEquals;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertThat;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 
 @PrepareForTest(Arguments.class)
 @PowerMockIgnore({"org.mockito.*", "android.*"})
@@ -116,23 +114,63 @@ public class JSAPITest {
     }
 
     @Test
-    public void reflect() throws Exception {
-        ReadableArray result = jsAPI.reflect(TestClass.class);
+    public void reflectStatic() throws Exception {
+        ReadableMap result = jsAPI.reflect(TestObject.class);
 
-        List<JavaOnlyMap> mapList = getMapList(result);
-        assertThat(mapList, containsInAnyOrder(
-                JavaOnlyMap.of("name", "staticB", "type", "staticMethod", "arguments", of("java.lang.String")),
-                JavaOnlyMap.of("name", "staticA", "type", "staticMethod"),
-                JavaOnlyMap.of("name", "staticA", "type", "staticMethod", "arguments", of("int")),
-                JavaOnlyMap.of("name", "STATIC_INT", "type", "staticField", "value", 0))
-        );
+        List<JavaOnlyMap> methodList = getMapList(result, "methods");
+        assertThat(methodList, containsInAnyOrder(
+                JavaOnlyMap.of("name", "staticA", "static", true),
+                JavaOnlyMap.of("name", "staticA", "static", true, "arguments", of("int")),
+                JavaOnlyMap.of("name", "staticB", "static", true, "arguments", of("java.lang.String"))
+        ));
+        List<JavaOnlyMap> fieldList = getMapList(result, "fields");
+        assertThat(fieldList, containsInAnyOrder(
+                JavaOnlyMap.of("name", "STATIC_INT", "static", true, "value", 0),
+                JavaOnlyMap.of("name", "STATIC_STRING", "static", true, "value", "abc"),
+                JavaOnlyMap.of("name", "STATIC_BOOLEAN", "static", true, "value", true),
+                JavaOnlyMap.of("name", "STATIC_DOUBLE", "static", true, "value", 10.1)
+        ));
+
+        assertThat(result.getString("className"), is("com.androidjsapi.test.TestObject"));
+    }
+
+    @Test
+    public void reflectInstance() throws Exception {
+        TestObject instance = new TestObject();
+        ReadableMap result = jsAPI.reflect(instance);
+
+        List<JavaOnlyMap> methodList = getMapList(result, "methods");
+        assertThat(methodList, containsInAnyOrder(
+                JavaOnlyMap.of("name", "staticA", "static", true),
+                JavaOnlyMap.of("name", "staticA", "static", true, "arguments", of("int")),
+                JavaOnlyMap.of("name", "staticB", "static", true, "arguments", of("java.lang.String")),
+
+                JavaOnlyMap.of("name", "a"),
+                JavaOnlyMap.of("name", "a", "arguments", of("int")),
+                JavaOnlyMap.of("name", "b", "arguments", of("java.lang.String"))
+        ));
+        List<JavaOnlyMap> fieldList = getMapList(result, "fields");
+        assertThat(fieldList, containsInAnyOrder(
+                JavaOnlyMap.of("name", "STATIC_INT", "static", true, "value", 0),
+                JavaOnlyMap.of("name", "STATIC_STRING", "static", true, "value", "abc"),
+                JavaOnlyMap.of("name", "STATIC_BOOLEAN", "static", true, "value", true),
+                JavaOnlyMap.of("name", "STATIC_DOUBLE", "static", true, "value", 10.1),
+
+                JavaOnlyMap.of("name", "INT", "value", 0),
+                JavaOnlyMap.of("name", "STRING", "value", "abc"),
+                JavaOnlyMap.of("name", "BOOLEAN", "value", true),
+                JavaOnlyMap.of("name", "DOUBLE", "value", 10.1)
+        ));
+
+        assertThat(result.getString("className"), is("com.androidjsapi.test.TestObject"));
     }
 
     @NonNull
-    private List<JavaOnlyMap> getMapList(ReadableArray result) {
+    private List<JavaOnlyMap> getMapList(ReadableMap reflection, String key) {
+        ReadableArray array = reflection.getArray(key);
         List<JavaOnlyMap> maps = new ArrayList<>();
-        for (int i = 0; i < result.size(); i++) {
-            maps.add((JavaOnlyMap) result.getMap(i));
+        for (int i = 0; i < array.size(); i++) {
+            maps.add((JavaOnlyMap) array.getMap(i));
         }
         return maps;
     }
