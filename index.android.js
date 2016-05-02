@@ -12,10 +12,9 @@ import React, {
 } from 'react-native';
 import AndroidBridge from './app/AndroidBridge';
 
-(async function callAndroid() {
+(async function () {
   const Toast = await AndroidBridge.createBridge('android.widget.Toast');
-  const toastText = await Toast.makeText(AndroidBridge.context, 'Awesome', Toast.LENGTH_SHORT);
-  toastText.show();
+  (await Toast.makeText(AndroidBridge.context, 'Awesome', Toast.LENGTH_SHORT)).show();
 })();
 
 class AndroidJSAPI extends Component {
